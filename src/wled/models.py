@@ -35,10 +35,21 @@ class AwesomeVersionSerializationStrategy(SerializationStrategy, use_annotations
 
     def deserialize(self, value: str) -> AwesomeVersion | None:
         """Deserialize string to AwesomeVersion object."""
-        version = get_awesome_version(value)
+        normalized = normalize_version_number(value)
+        version = get_awesome_version(normalized)
         if not version.valid:
             return None
         return version
+
+
+def normalize_version_number(value: str) -> str:
+    """Normalize the version number from 16.0 to one accepted by AwesomeVersion."""
+    normalized = value
+    if value.find(".") < 2:
+        split = value.split("-")
+        normalized = f"0.{split[0]}0-{split[1]}" if len(split) > 1 else split[0]
+
+    return normalized
 
 
 class TimedeltaSerializationStrategy(SerializationStrategy, use_annotations=True):
@@ -727,7 +738,8 @@ class Device(BaseModel):
     @classmethod
     def __pre_deserialize__(cls, d: dict[Any, Any]) -> dict[Any, Any]:
         """Pre deserialize hook for Device object."""
-        if (version := d.get("info", {}).get("ver")) and version < MIN_REQUIRED_VERSION:
+        v = d.get("info", {}).get("ver")
+        if (version := normalize_version_number(v)) and version < MIN_REQUIRED_VERSION:
             msg = (
                 f"Unsupported firmware version {version}. "
                 f"Minimum required version is {MIN_REQUIRED_VERSION}. "
